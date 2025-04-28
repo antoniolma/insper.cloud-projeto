@@ -1,8 +1,14 @@
 from fastapi import FastAPI, Query, Path, status, HTTPException
 from typing import Annotated
 from models import *
+from dotenv import load_dotenv
+import httpx
+import os
 
 app = FastAPI()
+load_dotenv()
+API_KEY = os.getenv("AWESOME_API_KEY")
+API_URL = f"https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL"
 
 @app.post("/registrar")
 async def create_user(
@@ -28,6 +34,14 @@ async def create_user(
 async def user_login():
     pass
 
+# API de Cotações de Moedas
 @app.get("/consultar")
 async def consult():
-    pass
+    if not API_KEY:
+        raise HTTPException(status_code=500, detail="API key não configurada")
+    
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(API_URL, timeout=10.0)
+    if resp.status_code != 200:
+        raise HTTPException(status_code=resp.status_code, detail=resp.json())
+    return resp.json()
