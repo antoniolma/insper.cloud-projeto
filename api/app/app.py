@@ -8,7 +8,6 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from passlib.context import CryptContext
 import jwt
-from jwt.exceptions import InvalidTokenError
 
 DATABASE_URL = "postgresql://postgres:postgres@db:5432/postgres"
 
@@ -25,6 +24,8 @@ app = FastAPI()
 load_dotenv()
 API_KEY = os.getenv("AWESOME_API_KEY")
 API_URL = f"https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL"
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
 #########################################################################
 # Classe Usuário
@@ -77,9 +78,9 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    # encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    # return encoded_jwt    
-    return new_user
+    to_encode = {"sub": new_user.email}
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return {"jwt": encoded_jwt}  
 
 @app.post("/login")
 def user_login(user: UserLogin, db: Session = Depends(get_db)):
@@ -97,10 +98,9 @@ def user_login(user: UserLogin, db: Session = Depends(get_db)):
     if not verify_password(db_user.senha, loginSenha):
         raise HTTPException(status_code=401, detail="Email  not registered")
     
-    # Devolve o jwt
-    jwt = "oi Nery"
-
-    return {"jwt": ""}
+    to_encode = {"sub": user.email}
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return {"jwt": encoded_jwt}  
 
 # API de Cotações de Moedas
 @app.get("/consultar")
