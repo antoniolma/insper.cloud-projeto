@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Query, Path, status, HTTPException
 from typing import Annotated
-from models import *
+from api.app.models import *
 from dotenv import load_dotenv
 import httpx
 import os
