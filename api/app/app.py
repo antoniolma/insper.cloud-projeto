@@ -83,7 +83,24 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
 
 @app.post("/login")
 def user_login(user: UserLogin, db: Session = Depends(get_db)):
-    pass
+    """
+    Login do Usuário já cadastrado.
+
+    - **email**: Email do usuário (ex: mochilamonsterhigh@gmail.com).
+    - **senha**: Senha de autenticação do usuário.
+    """
+    db_user = db.query(User).filter(User.email == user.email).first()
+    if not db_user:
+        raise HTTPException(status_code=401, detail="Email not registered")
+    
+    loginSenha = get_password_hash(UserLogin.senha)
+    if not verify_password(db_user.senha, loginSenha):
+        raise HTTPException(status_code=401, detail="Email  not registered")
+    
+    # Devolve o jwt
+    jwt = "oi Nery"
+
+    return {"jwt": ""}
 
 # API de Cotações de Moedas
 @app.get("/consultar")
