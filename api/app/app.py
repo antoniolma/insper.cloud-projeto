@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends, Query, Path, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from models import *
 from dotenv import load_dotenv
 import httpx
@@ -8,6 +9,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from passlib.context import CryptContext
 import jwt
+from jose import JWTError, jwt
 
 DATABASE_URL = "postgresql://postgres:postgres@db:5432/postgres"
 
@@ -55,6 +57,15 @@ def verify_password(plain_password, hashed_password):
 
 def get_password_hash(password):
     return pwd_context.hash(password)
+
+security = HTTPBearer()
+async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        raise HTTPException(status_code=403, detail="JWT ausente ou inválido")
 
 #########################################################################
 # Endpoints
@@ -104,7 +115,7 @@ def user_login(user: UserLogin, db: Session = Depends(get_db)):
 
 # API de Cotações de Moedas
 @app.get("/consultar")
-async def consult():
+async def consult(payload: dict = Depends(verify_token)):
     if not API_KEY:
         raise HTTPException(status_code=500, detail="API key não configurada")
     
