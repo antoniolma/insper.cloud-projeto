@@ -1,21 +1,64 @@
-from fastapi import FastAPI, Query, Path, status, HTTPException
-from typing import Annotated
-from api.app.models import *
+from fastapi import FastAPI, HTTPException, Depends, Query, Path, status
+from models import *
 from dotenv import load_dotenv
 import httpx
 import os
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from passlib.context import CryptContext
+import jwt
+from jwt.exceptions import InvalidTokenError
+
+DATABASE_URL = "postgresql://postgres:postgres@db:5432/postgres"
+
+# SQLAlchemy setup
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(bind=engine)
+Base = declarative_base()
+
+# Obter hash da senha
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 app = FastAPI()
+
 load_dotenv()
 API_KEY = os.getenv("AWESOME_API_KEY")
 API_URL = f"https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL"
 
+#########################################################################
+# Classe Usuário
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+
+Base.metadata.create_all(bind=engine)
+
+#########################################################################
+# Auxiliares
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+#########################################################################
+# Endpoints
 @app.post("/registrar")
-async def create_user(
-        nome: Annotated[str, Query(max_length=100)], 
-        email: Annotated[str, Query(max_length=100)], 
-        senha: str
-    ):
+async def create_user(user: UserCreate, db: Session = Depends(get_db)):
     """
     Cadastra um novo usuário no sistema.
 
@@ -23,15 +66,23 @@ async def create_user(
     - **email**: Email do usuário (ex: mochilamonsterhigh@gmail.com).
     - **senha**: Senha de autenticação do usuário.
     """
-    new_user = Usuario(
-        nome=nome,
-        email=email,
-        senha=senha
+    db_user = db.query(User).filter(User.email == user.email).first()
+    if db_user:
+        raise HTTPException(status_code=409, detail="Email already registered")
+    new_user = User(
+        nome=user.nome,
+        email=user.email,
+        senha=get_password_hash(user.senha)
     )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    # encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    # return encoded_jwt    
     return new_user
 
 @app.post("/login")
-async def user_login():
+def user_login(user: UserLogin, db: Session = Depends(get_db)):
     pass
 
 # API de Cotações de Moedas
