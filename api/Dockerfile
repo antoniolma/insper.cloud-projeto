@@ -1,25 +1,18 @@
-# etapa de build
-FROM python:3.11-slim AS build
+FROM python:3.11-slim
+
 WORKDIR /usr/src/app
 
-# 1) copie só o requirements para acelerar cache
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      libpq-dev \
+      build-essential \
+ && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
-RUN pip install --no-cache-dir -r requirements.txt
-
-# 2) copie todo o código da sua app
 COPY app/ .
 
-# --- fim da build stage ---
+EXPOSE 80
 
-# etapa de runtime
-FROM python:3.11-slim
-WORKDIR /usr/src/app
-
-# pegue tudo do estágio de build
-COPY --from=build /usr/src/app .
-
-EXPOSE 8000
-
-# exemplo com Uvicorn/FastAPI
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80"]

@@ -8,10 +8,12 @@ from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from passlib.context import CryptContext
-import jwt
+import jwt as pyjwt
 from jose import JWTError, jwt
 
-DATABASE_URL = "postgresql://postgres:postgres@db:5432/postgres"
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 # SQLAlchemy setup
 engine = create_engine(DATABASE_URL)
@@ -23,7 +25,6 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 app = FastAPI()
 
-load_dotenv()
 API_KEY = os.getenv("AWESOME_API_KEY")
 API_URL = f"https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL"
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -36,7 +37,7 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
+    nome = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
 
@@ -58,18 +59,22 @@ def verify_password(plain_password, hashed_password):
 def get_password_hash(password):
     return pwd_context.hash(password)
 
-security = HTTPBearer()
-async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+security = HTTPBearer(auto_error=False)
+async def verify_token(credentials: Annotated[HTTPAuthorizationCredentials, None] = Depends(security)):
+    if credentials is None:
+        return None
+    
     token = credentials.credentials
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = pyjwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
     except JWTError:
-        raise HTTPException(status_code=403, detail="JWT ausente ou inválido")
+        raise HTTPException(status_code=403, detail="JWT ausente ou inválido.")
 
 #########################################################################
 # Endpoints
-@app.post("/registrar")
+
+@app.post("/registrar", summary="Cria um novo usuário")
 async def create_user(user: UserCreate, db: Session = Depends(get_db)):
     """
     Cadastra um novo usuário no sistema.
@@ -80,20 +85,20 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
     """
     db_user = db.query(User).filter(User.email == user.email).first()
     if db_user:
-        raise HTTPException(status_code=409, detail="Email already registered")
+        raise HTTPException(status_code=409, detail="Email já registrado.")
     new_user = User(
         nome=user.nome,
         email=user.email,
-        senha=get_password_hash(user.senha)
+        hashed_password=get_password_hash(user.senha)
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
     to_encode = {"sub": new_user.email}
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = pyjwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return {"jwt": encoded_jwt}  
 
-@app.post("/login")
+@app.post("/login", summary="Login de usuário")
 def user_login(user: UserLogin, db: Session = Depends(get_db)):
     """
     Login do Usuário já cadastrado.
@@ -103,21 +108,27 @@ def user_login(user: UserLogin, db: Session = Depends(get_db)):
     """
     db_user = db.query(User).filter(User.email == user.email).first()
     if not db_user:
-        raise HTTPException(status_code=401, detail="Email not registered")
+        raise HTTPException(status_code=401, detail="Email não registrado.")
     
-    loginSenha = get_password_hash(UserLogin.senha)
-    if not verify_password(db_user.senha, loginSenha):
-        raise HTTPException(status_code=401, detail="Email  not registered")
+    # loginSenha = get_password_hash(user.senha)
+    if not verify_password(user.senha, db_user.hashed_password):
+        # print(f"User:  {db_user.hashed_password}")
+        # print(f"login: {loginSenha}")
+        raise HTTPException(status_code=401, detail="Senha não confere.")
+        
     
     to_encode = {"sub": user.email}
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return {"jwt": encoded_jwt}  
+    encoded_jwt = pyjwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return {"jwt": encoded_jwt}
 
 # API de Cotações de Moedas
-@app.get("/consultar")
+@app.get("/consultar", summary="Consulta cotações (requer token válido)")
 async def consult(payload: dict = Depends(verify_token)):
+    if payload is None:
+        raise HTTPException(status_code=403, detail="JWT ausente ou inválido.")
+
     if not API_KEY:
-        raise HTTPException(status_code=500, detail="API key não configurada")
+        raise HTTPException(status_code=500, detail="API key não configurada.")
     
     async with httpx.AsyncClient() as client:
         resp = await client.get(API_URL, timeout=10.0)

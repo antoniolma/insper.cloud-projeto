@@ -17,6 +17,7 @@ class UserCreate(BaseModel):
     senha : Annotated[str, Field(
         title="Senha do Usuário",
         description="Senha de acesso do usuário",
+        examples=['HumbasBambas', '1234321', 'juju-rocks@23']
     )]
 
 class UserLogin(BaseModel):
@@ -28,4 +29,5 @@ class UserLogin(BaseModel):
     senha : Annotated[str, Field(
         title="Senha do Usuário",
         description="Senha de acesso do usuário",
+        examples=['HumbasBambas', '1234321', 'juju-rocks@23']
     )]
