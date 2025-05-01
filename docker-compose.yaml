@@ -1,15 +1,13 @@
 
 services:
   app:
-    build:
-      context: ./api
-      dockerfile: Dockerfile
+    image: antoniolma/app:v1.0.1
     ports:
-      - "80:80"
+      - "8080:80"
     env_file: .env
     environment:
-      # Atualize a URL de conexão para PostgreSQL
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # So coloquei o usuario, senha e db por que pediu
+      - DATABASE_URL=postgresql://antoniolma_pedronas:senha_muito_segura_123@db:5432/db
     depends_on:
       db:
         condition: service_healthy
@@ -21,12 +19,12 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=antoniolma_pedronas
+      - POSTGRES_PASSWORD=senha_muito_segura_123
+      - POSTGRES_DB=db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U antoniolma_pedronas -d db"]
+      interval: 5s  
       timeout: 5s
       retries: 5
     

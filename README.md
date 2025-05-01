@@ -31,3 +31,11 @@ Instale as dependências com:
 ``` shell
 python3 -m pip install -r requirements.txt --upgrade
 ```
+
+## Dockerizing
+
+Para rodar o Docker, utilize o comando:
+
+``` shell
+docker compose up
+```
