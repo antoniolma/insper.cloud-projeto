@@ -39,3 +39,7 @@ Para rodar o Docker, utilize o comando:
 ``` shell
 docker compose up
 ```
+
+## Docker Hub
+
+Link para o Docker Hub: <a href="https://hub.docker.com/repository/docker/antoniolma/app/general">hub.docker.com/repository/docker/antoniolma/app<a>
